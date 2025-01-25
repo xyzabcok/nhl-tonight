@@ -1,5 +1,5 @@
 // API endpoints and configuration
-const CORS_PROXY = 'https://corsproxy.io/?';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 const NHL_API = 'https://api-web.nhle.com/v1';
 const CURRENT_SEASON = '20242025';
 
@@ -29,7 +29,12 @@ async function cachedFetch(url, cacheKey, forceFresh = false) {
             return cache[cacheKey];
         }
 
-        const response = await fetch(proxyUrl);
+        const response = await fetch(proxyUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'x-requested-with': 'XMLHttpRequest'
+            }
+        });
         console.log('Response status:', response.status); // Debug log
 
         if (!response.ok) {
@@ -158,90 +163,3 @@ function displayPlayers(groupedPlayers) {
         `).join('');
 
         regionElement.innerHTML = `
-            <h2 class="region-name">
-                <span class="region-count">${players.length}</span>
-                ${region}
-            </h2>
-            <div class="players-grid">
-                ${playerCards}
-            </div>
-        `;
-        
-        container.appendChild(regionElement);
-    }
-}
-
-// Add team colors
-const teamColors = {
-    'WSH': '#C8102E',
-    'TOR': '#00205B',
-    'MTL': '#AF1E2D',
-    // Add more team colors as needed
-};
-
-function getTeamColor(teamAbbrev) {
-    return teamColors[teamAbbrev] || '#f8fafc'; // Default color if team not found
-}
-
-// Main function to initialize the application
-async function initializeApp() {
-    try {
-        showLoading();
-        
-        const todaysGames = await fetchTodaysSchedule();
-        const playingTeams = extractTeamsFromSchedule(todaysGames);
-        const playersList = await fetchPlayersFromTeams(playingTeams);
-        const groupedPlayers = groupPlayersByRegion(playersList);
-        
-        displayPlayers(groupedPlayers);
-        hideLoading();
-    } catch (error) {
-        handleError(error);
-    }
-}
-
-// Enhanced loading state with progress indicator
-function showLoading() {
-    const container = document.querySelector('.regions-container');
-    container.innerHTML = `
-        <div class="loading">
-            <div class="loading-spinner"></div>
-            <p class="loading-text">Loading player data...</p>
-            <div class="loading-progress">
-                <div class="progress-bar"></div>
-            </div>
-        </div>
-    `;
-}
-
-function hideLoading() {
-    const loadingElement = document.querySelector('.loading');
-    if (loadingElement) {
-        loadingElement.remove();
-    }
-}
-
-// Enhanced error handling
-function handleError(error) {
-    console.error('Detailed error:', error); // Debug log
-    const container = document.querySelector('.regions-container');
-    container.innerHTML = `
-        <div class="error-message">
-            <p>Sorry, there was an error loading the player data.</p>
-            <p>Error: ${error.message}</p>
-            <button onclick="retryLoad()" class="retry-button">Try Again</button>
-        </div>
-    `;
-}
-
-// Add retry functionality
-async function retryLoad() {
-    try {
-        await initializeApp();
-    } catch (error) {
-        handleError(error);
-    }
-}
-
-// Initialize the app when the page loads
-document.addEventListener('DOMContentLoaded', initializeApp);
