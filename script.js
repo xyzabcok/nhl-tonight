@@ -1,6 +1,6 @@
 // API endpoints and configuration
 const CORS_PROXY = 'https://corsproxy.io/?';
-const API_BASE_URL = CORS_PROXY + encodeURIComponent('https://api-web.nhle.com/v1');
+const NHL_API = 'https://api-web.nhle.com/v1';
 const CURRENT_SEASON = '20242025';
 
 // Cache for API responses
@@ -16,10 +16,11 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-// Enhanced fetch with error handling and timeout
+// Enhanced fetch with better error handling
 async function cachedFetch(url, cacheKey, forceFresh = false) {
     try {
-        console.log('Attempting to fetch:', url); // Debug log
+        const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+        console.log('Attempting to fetch from:', proxyUrl); // Debug log
         
         // Check cache first
         if (!forceFresh && cache[cacheKey] && cache.lastUpdated && 
@@ -28,20 +29,8 @@ async function cachedFetch(url, cacheKey, forceFresh = false) {
             return cache[cacheKey];
         }
 
-        // Add timeout to fetch
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Origin': window.location.origin
-            },
-            signal: controller.signal
-        });
-
-        clearTimeout(timeout);
+        const response = await fetch(proxyUrl);
+        console.log('Response status:', response.status); // Debug log
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -56,13 +45,10 @@ async function cachedFetch(url, cacheKey, forceFresh = false) {
     } catch (error) {
         console.error('Detailed fetch error:', {
             url,
+            proxyUrl: CORS_PROXY + encodeURIComponent(url),
             error: error.message,
             stack: error.stack
         });
-        
-        if (error.name === 'AbortError') {
-            throw new Error('Request timed out');
-        }
         throw new Error(`Failed to fetch data: ${error.message}`);
     }
 }
@@ -70,8 +56,10 @@ async function cachedFetch(url, cacheKey, forceFresh = false) {
 // Get today's schedule with better error handling
 async function fetchTodaysSchedule() {
     try {
-        console.log('Fetching schedule from:', `${API_BASE_URL}/schedule/now`); // Debug log
-        const data = await cachedFetch(`${API_BASE_URL}/schedule/now`, 'schedules');
+        const scheduleUrl = `${NHL_API}/schedule/now`;
+        console.log('Fetching schedule from:', scheduleUrl); // Debug log
+        
+        const data = await cachedFetch(scheduleUrl, 'schedules');
         
         if (!data || !data.gameWeek || !data.gameWeek[0]) {
             console.error('Invalid data structure:', data); // Debug log
@@ -103,7 +91,7 @@ async function fetchPlayersFromTeams(teams) {
     try {
         // Use Promise.all for concurrent requests
         const rosterPromises = teams.map(team => 
-            cachedFetch(`${API_BASE_URL}/roster/${team}/${CURRENT_SEASON}`, `roster-${team}`)
+            cachedFetch(`${NHL_API}/roster/${team}/${CURRENT_SEASON}`, `roster-${team}`)
         );
         
         const rosters = await Promise.all(rosterPromises);
